@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Mobile viewport [web:35][web:39] -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Mobile viewport [web:32][web:35] -->
     <title>Pseudo Data Analyzer</title>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script> <!-- PapaParse CDN [web:6][web:9] -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script> <!-- Chart.js CDN [web:2][web:3][web:40] -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script> <!-- Chart.js CDN [web:2][web:40] -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -449,22 +449,26 @@
             margin-bottom: 12px;
         }
 
+        /* UPDATED: better mobile table with horizontal scroll [web:41][web:46][web:52] */
         .table-container {
             max-height: 260px;
             overflow-y: auto;
+            overflow-x: auto;
             border-radius: 14px;
             background: rgba(15, 23, 42, 0.96);
             border: 1px solid rgba(30, 64, 175, 0.7);
+            -webkit-overflow-scrolling: touch;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.7rem;
+            min-width: 600px;
         }
 
         th, td {
-            padding: 7px 6px;
+            padding: 7px 8px;
             text-align: left;
             border-bottom: 1px solid rgba(31, 41, 55, 0.95);
             color: rgba(209, 213, 219, 0.98);
@@ -592,6 +596,10 @@
             .footer-right {
                 width: 100%;
                 justify-content: flex-start;
+            }
+
+            .table-container {
+                max-height: 220px;
             }
         }
 
@@ -743,7 +751,7 @@
                         <span class="icon">📋</span>
                         <span>Data preview</span>
                     </div>
-                    <div class="panel-subtitle">First 50 rows of your dataset, auto-formatted for quick scanning.</div>
+                    <div class="panel-subtitle">First 50 rows of your dataset, scrollable horizontally on mobile for comfort.</div>
                 </div>
             </div>
             <div class="table-container" id="dataTableContainer"></div>
@@ -760,7 +768,6 @@
             </div>
             <div class="footer-right">
                 <span style="color: rgba(148, 163, 184, 0.9); margin-right: 2px;">Connect:</span>
-                <!-- Replace # with your actual social links -->
                 <a class="social-link" href="https://github.com/Aromalbm07" target="_blank" aria-label="GitHub">
                     <span>GH</span>
                 </a>
@@ -840,7 +847,7 @@
 
                 window.addEventListener('resize', () => {
                     if (this.chartInstance) {
-                        this.chartInstance.resize(); // Keep chart responsive on mobile rotation [web:38][web:40]
+                        this.chartInstance.resize(); // Ensure mobile responsiveness [web:40]
                     }
                 });
             }
@@ -1172,7 +1179,7 @@
                 if (!this.chartInstance) return;
                 const link = document.createElement('a');
                 link.download = 'pseudo-data-analyzer-chart.png';
-                link.href = this.chartInstance.toBase64Image(); // PNG export via Chart.js [web:2][web:40]
+                link.href = this.chartInstance.toBase64Image(); // PNG export via Chart.js [web:40]
                 link.click();
             }
         }
