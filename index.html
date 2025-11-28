@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Mobile viewport [web:35][web:39] -->
+    <title>Pseudo Data Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script> <!-- PapaParse CDN [web:6][web:9] -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script> <!-- Chart.js CDN [web:2][web:3][web:40] -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #050510;
+            --bg-secondary: rgba(15, 15, 30, 0.9);
+            --glass-bg: rgba(255, 255, 255, 0.04);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #ffffff;
+            --text-secondary: #b8b8cc;
+            --accent-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+            --accent-strong: #6366f1;
+            --accent-soft: rgba(99, 102, 241, 0.15);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --shadow: 0 25px 45px rgba(0, 0, 0, 0.45);
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top, #111827 0, #020617 45%, #000 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.1) 0, transparent 55%),
+                radial-gradient(circle at 90% 80%, rgba(244, 114, 182, 0.12) 0, transparent 60%),
+                radial-gradient(circle at 50% 50%, rgba(129, 140, 248, 0.08) 0, transparent 65%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 16px 16px 10px;
+            flex: 1 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 22px;
+            animation: slideDown 0.7s ease-out;
+        }
+
+        .header-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 64, 175, 0.35));
+            box-shadow: 0 14px 32px rgba(15, 23, 42, 0.8);
+            margin-bottom: 8px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .header-title span.badge-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.25);
+        }
+
+        .header h1 {
+            font-size: clamp(2rem, 6vw, 3.2rem);
+            font-weight: 700;
+            background: var(--accent-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 0.03em;
+            margin-bottom: 6px;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            max-width: 520px;
+            margin: 0 auto;
+        }
+
+        .upload-area {
+            position: relative;
+            background: var(--glass-bg);
+            backdrop-filter: blur(18px);
+            border: 1px solid var(--glass-border);
+            border-radius: 22px;
+            padding: 26px 18px;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            margin-bottom: 18px;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.65);
+            overflow: hidden;
+        }
+
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            background: linear-gradient(135deg, rgba(94, 234, 212, 0.09), rgba(129, 140, 248, 0.5), rgba(244, 114, 182, 0.45));
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            z-index: -1;
+        }
+
+        .upload-area:hover::before,
+        .upload-area.dragover::before {
+            opacity: 1;
+        }
+
+        .upload-area:hover {
+            transform: translateY(-2px) scale(1.005);
+            border-color: rgba(129, 140, 248, 0.8);
+            box-shadow: 0 20px 48px rgba(15, 23, 42, 0.9);
+        }
+
+        .upload-area.dragover {
+            background: rgba(22, 163, 74, 0.08);
+            border-color: rgba(34, 197, 94, 0.9);
+        }
+
+        .upload-inner {
+            position: relative;
+            z-index: 1;
+        }
+
+        .upload-icon {
+            width: 58px;
+            height: 58px;
+            margin: 0 auto 10px;
+            border-radius: 20px;
+            background: radial-gradient(circle at 0 0, rgba(248, 250, 252, 0.22), transparent),
+                        linear-gradient(135deg, rgba(59, 130, 246, 0.85), rgba(236, 72, 153, 0.95));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            box-shadow: 0 14px 32px rgba(59, 130, 246, 0.6);
+            transition: transform 0.3s ease;
+        }
+
+        .upload-area:hover .upload-icon {
+            transform: translateY(-2px) scale(1.04) rotate(-2deg);
+        }
+
+        .upload-title {
+            font-size: 0.95rem;
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+
+        .upload-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .upload-hint {
+            font-size: 0.72rem;
+            color: rgba(148, 163, 184, 0.9);
+        }
+
+        .upload-area input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            inset: 0;
+            cursor: pointer;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.99));
+            border-radius: 18px;
+            padding: 10px 12px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.75);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at top left, rgba(129, 140, 248, 0.25), transparent 60%);
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(148, 163, 184, 0.9);
+            margin-bottom: 3px;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #e5e7eb;
+        }
+
+        .stat-pill {
+            margin-top: 3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-size: 0.64rem;
+            background: rgba(15, 23, 42, 0.96);
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            color: rgba(148, 163, 184, 0.95);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.3fr);
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            backdrop-filter: blur(22px);
+            border-radius: 20px;
+            padding: 16px 14px;
+            border: 1px solid rgba(30, 64, 175, 0.45);
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at top, rgba(129, 140, 248, 0.12), transparent 60%);
+            pointer-events: none;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .panel-title {
+            font-size: 0.98rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .panel-title span.icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.25);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            color: #bfdbfe;
+        }
+
+        .panel-subtitle {
+            font-size: 0.75rem;
+            color: rgba(148, 163, 184, 0.9);
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            font-size: 0.8rem;
+            color: #e5e7eb;
+        }
+
+        select, button {
+            width: 100%;
+            padding: 9px 10px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        select {
+            background: rgba(15, 23, 42, 0.96);
+            color: var(--text-primary);
+            border: 1px solid rgba(55, 65, 81, 0.9);
+        }
+
+        select:focus {
+            outline: none;
+            border-color: rgba(129, 140, 248, 0.95);
+            box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.95);
+        }
+
+        select option {
+            background: #020617;
+            color: #e5e7eb;
+        }
+
+        .btn-primary {
+            background: radial-gradient(circle at 0 0, rgba(248, 250, 252, 0.22), transparent),
+                        linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            font-weight: 600;
+            border: none;
+            box-shadow: 0 12px 26px rgba(79, 70, 229, 0.8);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            letter-spacing: 0.03em;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px) scale(1.01);
+            box-shadow: 0 14px 30px rgba(79, 70, 229, 0.95);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .btn-ghost {
+            background: rgba(15, 23, 42, 0.95);
+            color: rgba(226, 232, 240, 0.95);
+            border: 1px solid rgba(75, 85, 99, 0.9);
+            font-weight: 500;
+        }
+
+        .btn-ghost:hover:not(:disabled) {
+            background: rgba(31, 41, 55, 0.95);
+        }
+
+        .btn-ghost:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .btn-ghost.small {
+            width: auto;
+            padding: 5px 8px;
+            font-size: 0.7rem;
+            border-radius: 999px;
+        }
+
+        .download-icon {
+            font-size: 0.8rem;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 260px;
+            border-radius: 16px;
+            overflow: hidden;
+            background: radial-gradient(circle at top, rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.98));
+            border: 1px solid rgba(30, 64, 175, 0.6);
+        }
+
+        .chart-wrapper canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .chart-empty-state {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: rgba(148, 163, 184, 0.9);
+            font-size: 0.8rem;
+            padding: 0 8px;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .chart-empty-badge {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px dashed rgba(148, 163, 184, 0.7);
+        }
+
+        .preview-panel {
+            margin-bottom: 12px;
+        }
+
+        .table-container {
+            max-height: 260px;
+            overflow-y: auto;
+            border-radius: 14px;
+            background: rgba(15, 23, 42, 0.96);
+            border: 1px solid rgba(30, 64, 175, 0.7);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.7rem;
+        }
+
+        th, td {
+            padding: 7px 6px;
+            text-align: left;
+            border-bottom: 1px solid rgba(31, 41, 55, 0.95);
+            color: rgba(209, 213, 219, 0.98);
+            word-break: break-word;
+        }
+
+        th {
+            background: linear-gradient(to right, rgba(30, 64, 175, 0.7), rgba(59, 130, 246, 0.7));
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            font-size: 0.68rem;
+        }
+
+        tr:nth-child(even) td {
+            background: rgba(15, 23, 42, 0.98);
+        }
+
+        tr:nth-child(odd) td {
+            background: rgba(17, 24, 39, 0.98);
+        }
+
+        .footer {
+            margin-top: 6px;
+            padding: 10px 14px 14px;
+            border-top: 1px solid rgba(30, 64, 175, 0.75);
+            background: radial-gradient(circle at top, rgba(15, 23, 42, 0.98), #020617);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 -12px 32px rgba(15, 23, 42, 0.9);
+            flex-shrink: 0;
+        }
+
+        .footer-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px 10px;
+        }
+
+        .footer-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            color: rgba(148, 163, 184, 0.95);
+        }
+
+        .footer-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(129, 140, 248, 0.9);
+        }
+
+        .footer-name {
+            font-weight: 500;
+            color: #e5e7eb;
+        }
+
+        .footer-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+        }
+
+        .social-link {
+            width: 26px;
+            height: 26px;
+            border-radius: 999px;
+            border: 1px solid rgba(75, 85, 99, 0.9);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(209, 213, 219, 0.98);
+            text-decoration: none;
+            background: rgba(15, 23, 42, 0.95);
+            transition: all 0.2s ease;
+            font-size: 0.68rem;
+        }
+
+        .social-link:hover {
+            border-color: rgba(129, 140, 248, 0.95);
+            color: #a5b4fc;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 14px rgba(79, 70, 229, 0.7);
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .panel {
+                padding: 14px 12px;
+            }
+
+            .chart-wrapper {
+                height: 260px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 12px 10px 8px;
+            }
+
+            .upload-area {
+                padding: 22px 14px;
+            }
+
+            .header h1 {
+                font-size: 1.9rem;
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .footer-right {
+                width: 100%;
+                justify-content: flex-start;
+            }
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-22px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-title">
+                <span class="badge-dot"></span>
+                <span>Pseudo Data Analyzer · In-browser CSV insights</span>
+            </div>
+            <h1>Pseudo Data Analyzer</h1>
+            <p>Upload any CSV, explore your data instantly, and build animated charts in seconds.</p>
+        </header>
+
+        <section class="upload-area" id="uploadArea">
+            <div class="upload-inner">
+                <div class="upload-icon">📊</div>
+                <h3 class="upload-title">Drop your CSV file here or tap to browse</h3>
+                <p class="upload-subtitle">Secure, client-side analysis. No data ever leaves your browser.</p>
+                <p class="upload-hint">Supports CSV files up to 10MB • First 1000 rows used for smooth visuals</p>
+            </div>
+            <input type="file" id="csvFile" accept=".csv" />
+        </section>
+
+        <section id="statsSection" class="stats-grid hidden">
+            <article class="stat-card">
+                <div class="stat-label">Rows detected</div>
+                <div class="stat-value" id="rowCount">-</div>
+                <div class="stat-pill">
+                    <span>Sampled for preview & charts</span>
+                </div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-label">Columns</div>
+                <div class="stat-value" id="colCount">-</div>
+                <div class="stat-pill">
+                    <span>Auto-detected headers</span>
+                </div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-label">Numeric columns</div>
+                <div class="stat-value" id="numericCount">-</div>
+                <div class="stat-pill">
+                    <span>Ready for charts</span>
+                </div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-label">File size</div>
+                <div class="stat-value" id="fileSize">-</div>
+                <div class="stat-pill">
+                    <span>Local processing only</span>
+                </div>
+            </article>
+        </section>
+
+        <section class="main-content">
+            <aside class="panel">
+                <div class="panel-header">
+                    <div>
+                        <div class="panel-title">
+                            <span class="icon">⚙️</span>
+                            <span>Chart controls</span>
+                        </div>
+                        <div class="panel-subtitle">Choose columns and chart style to bring your data to life.</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="xAxisSelect">X-axis column</label>
+                    <select id="xAxisSelect">
+                        <option value="">Select column...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="yAxisSelect">Y-axis column</label>
+                    <select id="yAxisSelect">
+                        <option value="">Select column...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="chartTypeSelect">Chart type</label>
+                    <select id="chartTypeSelect">
+                        <option value="bar">Bar chart</option>
+                        <option value="line">Line chart</option>
+                        <option value="pie">Pie chart</option>
+                        <option value="scatter">Scatter plot</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-top: 8px;">
+                    <button class="btn-primary" id="generateChart">
+                        <span>Generate chart</span>
+                    </button>
+                </div>
+
+                <div class="form-group" style="margin-top: 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <button class="btn-ghost small" id="downloadChart" disabled title="Download chart as PNG">
+                        <span class="download-icon">⬇️</span>
+                    </button>
+                    <span style="font-size: 0.7rem; color: rgba(148, 163, 184, 0.9);">Small PNG export button · optimized for mobile dashboards</span>
+                </div>
+            </aside>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <div>
+                        <div class="panel-title">
+                            <span class="icon">📈</span>
+                            <span>Interactive chart</span>
+                        </div>
+                        <div class="panel-subtitle">Smooth animations, hover highlights, and real-time updates as you explore.</div>
+                    </div>
+                    <button class="btn-ghost small" id="downloadBtn" disabled title="Download chart as PNG">
+                        <span class="download-icon">⬇️</span>
+                    </button>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="dataChart"></canvas>
+                    <div class="chart-empty-state" id="chartEmptyState">
+                        <div class="chart-empty-badge">Awaiting CSV upload</div>
+                        <div>Upload a file and generate your first chart to see it here.</div>
+                    </div>
+                </div>
+            </section>
+        </section>
+
+        <section class="panel preview-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">
+                        <span class="icon">📋</span>
+                        <span>Data preview</span>
+                    </div>
+                    <div class="panel-subtitle">First 50 rows of your dataset, auto-formatted for quick scanning.</div>
+                </div>
+            </div>
+            <div class="table-container" id="dataTableContainer"></div>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-left">
+                <div class="footer-dot"></div>
+                <span>Creator</span>
+                <span class="footer-name">Aromal B Madhu</span>
+                <span>· Pseudo Data Analyzer</span>
+            </div>
+            <div class="footer-right">
+                <span style="color: rgba(148, 163, 184, 0.9); margin-right: 2px;">Connect:</span>
+                <!-- Replace # with your actual social links -->
+                <a class="social-link" href="https://github.com/Aromalbm07" target="_blank" aria-label="GitHub">
+                    <span>GH</span>
+                </a>
+                <a class="social-link" href="https://www.linkedin.com/in/aromal-b-madhu-7ab218275/" target="_blank" aria-label="LinkedIn">
+                    <span>in</span>
+                </a>
+                <a class="social-link" href="https://t.me/psuedoailearner" target="_blank" aria-label="Telegram">
+                    <span>TG</span>
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        class DataVisualizer {
+            constructor() {
+                this.csvData = null;
+                this.numericColumns = [];
+                this.chartInstance = null;
+                this.init();
+            }
+
+            init() {
+                this.cacheElements();
+                this.bindEvents();
+            }
+
+            cacheElements() {
+                this.uploadArea = document.getElementById('uploadArea');
+                this.fileInput = document.getElementById('csvFile');
+                this.statsSection = document.getElementById('statsSection');
+                this.rowCountEl = document.getElementById('rowCount');
+                this.colCountEl = document.getElementById('colCount');
+                this.numericCountEl = document.getElementById('numericCount');
+                this.fileSizeEl = document.getElementById('fileSize');
+                this.xAxisSelect = document.getElementById('xAxisSelect');
+                this.yAxisSelect = document.getElementById('yAxisSelect');
+                this.chartTypeSelect = document.getElementById('chartTypeSelect');
+                this.generateBtn = document.getElementById('generateChart');
+                this.downloadBtnMain = document.getElementById('downloadBtn');
+                this.downloadBtnSmall = document.getElementById('downloadChart');
+                this.tableContainer = document.getElementById('dataTableContainer');
+                this.chartEmptyState = document.getElementById('chartEmptyState');
+                this.chartCanvas = document.getElementById('dataChart');
+            }
+
+            bindEvents() {
+                this.uploadArea.addEventListener('click', () => this.fileInput.click());
+
+                this.fileInput.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                        this.handleFile(e.target.files[0]);
+                    }
+                });
+
+                this.uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.add('dragover');
+                });
+
+                this.uploadArea.addEventListener('dragleave', () => {
+                    this.uploadArea.classList.remove('dragover');
+                });
+
+                this.uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.remove('dragover');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.handleFile(files[0]);
+                    }
+                });
+
+                this.generateBtn.addEventListener('click', () => this.generateChart());
+                this.downloadBtnMain.addEventListener('click', () => this.downloadChart());
+                this.downloadBtnSmall.addEventListener('click', () => this.downloadChart());
+
+                window.addEventListener('resize', () => {
+                    if (this.chartInstance) {
+                        this.chartInstance.resize(); // Keep chart responsive on mobile rotation [web:38][web:40]
+                    }
+                });
+            }
+
+            async handleFile(file) {
+                if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+                    alert('Please select a valid CSV file.');
+                    return;
+                }
+
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('File size too large. Maximum 10MB allowed.');
+                    return;
+                }
+
+                const text = await file.text();
+                Papa.parse(text, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        this.csvData = results.data;
+                        this.processData(file);
+                    },
+                    error: () => {
+                        alert('Error parsing CSV file. Please check the format and try again.');
+                    }
+                });
+            }
+
+            processData(file) {
+                const validRows = this.csvData.filter(row => Object.values(row).some(val => val !== ''));
+                this.csvData = validRows.slice(0, 1000);
+
+                this.updateStats(file);
+                this.populateColumnSelects();
+                this.renderTable();
+                this.showSections();
+            }
+
+            updateStats(file) {
+                const rowCount = this.csvData.length;
+                const colCount = this.csvData.length > 0 ? Object.keys(this.csvData[0]).length : 0;
+
+                this.numericColumns = Object.keys(this.csvData[0] || {}).filter(col => {
+                    return this.csvData.some(row => {
+                        const val = row[col];
+                        return val !== '' && !isNaN(val) && !isNaN(parseFloat(val));
+                    });
+                });
+
+                this.rowCountEl.textContent = rowCount.toLocaleString();
+                this.colCountEl.textContent = colCount;
+                this.numericCountEl.textContent = this.numericColumns.length;
+                this.fileSizeEl.textContent = (file.size / 1024 / 1024).toFixed(1) + 'MB';
+            }
+
+            populateColumnSelects() {
+                const columns = Object.keys(this.csvData[0] || {});
+                this.xAxisSelect.innerHTML = '<option value="">Select column...</option>';
+                this.yAxisSelect.innerHTML = '<option value="">Select column...</option>';
+
+                columns.forEach(col => {
+                    const optionX = new Option(col, col);
+                    const optionY = new Option(col, col);
+                    if (this.numericColumns.includes(col)) {
+                        optionY.textContent = col + ' • numeric';
+                    }
+                    this.xAxisSelect.add(optionX);
+                    this.yAxisSelect.add(optionY);
+                });
+            }
+
+            renderTable() {
+                const previewData = this.csvData.slice(0, 50);
+                const columns = Object.keys(previewData[0] || {});
+                if (columns.length === 0) {
+                    this.tableContainer.innerHTML = '<div style="padding: 10px; font-size: 0.7rem; color: rgba(148,163,184,0.95);">No rows available to preview.</div>';
+                    return;
+                }
+
+                let tableHTML = '<table><thead><tr>';
+                columns.forEach(col => {
+                    tableHTML += `<th>${this.escapeHTML(col)}</th>`;
+                });
+                tableHTML += '</tr></thead><tbody>';
+
+                previewData.forEach(row => {
+                    tableHTML += '<tr>';
+                    columns.forEach(col => {
+                        const value = row[col] ?? '';
+                        tableHTML += `<td>${this.escapeHTML(String(value))}</td>`;
+                    });
+                    tableHTML += '</tr>';
+                });
+
+                tableHTML += '</tbody></table>';
+                this.tableContainer.innerHTML = tableHTML;
+            }
+
+            escapeHTML(str) {
+                return str.replace(/[&<>"']/g, (c) => {
+                    const map = {
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#39;'
+                    };
+                    return map[c] || c;
+                });
+            }
+
+            showSections() {
+                this.statsSection.classList.remove('hidden');
+                this.chartEmptyState.classList.add('hidden');
+            }
+
+            generateChart() {
+                if (!this.csvData || this.csvData.length === 0) {
+                    alert('Please upload a CSV file first.');
+                    return;
+                }
+
+                const xCol = this.xAxisSelect.value;
+                const yCol = this.yAxisSelect.value;
+                const chartType = this.chartTypeSelect.value;
+
+                if (!xCol || !yCol) {
+                    alert('Please select both X and Y axis columns.');
+                    return;
+                }
+
+                this.createChart(xCol, yCol, chartType);
+            }
+
+            createChart(xCol, yCol, type) {
+                const ctx = this.chartCanvas.getContext('2d');
+
+                if (this.chartInstance) {
+                    this.chartInstance.destroy();
+                }
+
+                if (type === 'scatter') {
+                    const scatterData = this.csvData
+                        .map(row => {
+                            const xVal = parseFloat(row[xCol]);
+                            const yVal = parseFloat(row[yCol]);
+                            if (isNaN(xVal) || isNaN(yVal)) return null;
+                            return { x: xVal, y: yVal };
+                        })
+                        .filter(Boolean)
+                        .slice(0, 200);
+
+                    this.chartInstance = new Chart(ctx, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [{
+                                label: `${yCol} vs ${xCol}`,
+                                data: scatterData,
+                                backgroundColor: 'rgba(129, 140, 248, 0.8)',
+                                borderColor: 'rgba(129, 140, 248, 1)',
+                                borderWidth: 1.5,
+                                pointRadius: 4,
+                                pointHoverRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    labels: {
+                                        color: '#e5e7eb',
+                                        font: { size: 11, weight: '500' }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    title: { display: true, text: xCol, color: '#cbd5f5' },
+                                    ticks: { color: '#9ca3af' },
+                                    grid: { color: 'rgba(55, 65, 81, 0.7)' }
+                                },
+                                y: {
+                                    title: { display: true, text: yCol, color: '#cbd5f5' },
+                                    ticks: { color: '#9ca3af' },
+                                    grid: { color: 'rgba(55, 65, 81, 0.7)' }
+                                }
+                            },
+                            animation: {
+                                duration: 1200,
+                                easing: 'easeOutQuart'
+                            },
+                            hover: {
+                                animationDuration: 180
+                            }
+                        }
+                    });
+                } else if (type === 'pie') {
+                    const grouped = {};
+                    this.csvData.forEach(row => {
+                        const label = row[xCol] || 'Unknown';
+                        const val = parseFloat(row[yCol]);
+                        if (!isNaN(val)) {
+                            grouped[label] = (grouped[label] || 0) + val;
+                        }
+                    });
+
+                    const labels = Object.keys(grouped).slice(0, 10);
+                    const data = labels.map(l => grouped[l]);
+
+                    const colors = [
+                        'rgba(129, 140, 248, 0.9)',
+                        'rgba(34, 197, 94, 0.9)',
+                        'rgba(248, 113, 113, 0.9)',
+                        'rgba(251, 191, 36, 0.9)',
+                        'rgba(56, 189, 248, 0.9)',
+                        'rgba(244, 114, 182, 0.9)',
+                        'rgba(52, 211, 153, 0.9)',
+                        'rgba(96, 165, 250, 0.9)',
+                        'rgba(248, 250, 252, 0.9)',
+                        'rgba(190, 242, 100, 0.9)'
+                    ];
+
+                    this.chartInstance = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels,
+                            datasets: [{
+                                data,
+                                backgroundColor: colors.slice(0, labels.length),
+                                borderColor: 'rgba(15, 23, 42, 0.95)',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        color: '#e5e7eb',
+                                        font: { size: 9 }
+                                    }
+                                }
+                            },
+                            layout: {
+                                padding: { top: 6, bottom: 0 }
+                            },
+                            animation: {
+                                duration: 1200,
+                                easing: 'easeOutQuart'
+                            }
+                        }
+                    });
+                } else {
+                    const labels = this.csvData.map(row => row[xCol]).filter(v => v !== undefined && v !== null && v !== '');
+                    const data = this.csvData.map(row => {
+                        const val = parseFloat(row[yCol]);
+                        return isNaN(val) ? null : val;
+                    });
+
+                    const combined = labels.map((label, idx) => ({ label, value: data[idx] }))
+                        .filter(item => item.value !== null)
+                        .slice(0, 120);
+
+                    const finalLabels = combined.map(item => item.label);
+                    const finalData = combined.map(item => item.value);
+
+                    this.chartInstance = new Chart(ctx, {
+                        type,
+                        data: {
+                            labels: finalLabels,
+                            datasets: [{
+                                label: `${yCol} vs ${xCol}`,
+                                data: finalData,
+                                backgroundColor: type === 'line'
+                                    ? 'rgba(129, 140, 248, 0.18)'
+                                    : 'rgba(129, 140, 248, 0.9)',
+                                borderColor: 'rgba(129, 140, 248, 1)',
+                                borderWidth: 2,
+                                tension: type === 'line' ? 0.35 : 0,
+                                fill: type === 'line',
+                                pointRadius: type === 'line' ? 2.5 : 0,
+                                pointHoverRadius: 5
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    labels: {
+                                        color: '#e5e7eb',
+                                        font: { size: 11, weight: '500' }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        color: '#9ca3af',
+                                        maxTicksLimit: 6
+                                    },
+                                    grid: { color: 'rgba(55, 65, 81, 0.7)' }
+                                },
+                                y: {
+                                    ticks: { color: '#9ca3af' },
+                                    grid: { color: 'rgba(55, 65, 81, 0.7)' }
+                                }
+                            },
+                            animation: {
+                                duration: 1200,
+                                easing: 'easeOutQuart'
+                            },
+                            hover: {
+                                animationDuration: 180
+                            }
+                        }
+                    });
+                }
+
+                this.downloadBtnMain.disabled = false;
+                this.downloadBtnSmall.disabled = false;
+            }
+
+            downloadChart() {
+                if (!this.chartInstance) return;
+                const link = document.createElement('a');
+                link.download = 'pseudo-data-analyzer-chart.png';
+                link.href = this.chartInstance.toBase64Image(); // PNG export via Chart.js [web:2][web:40]
+                link.click();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new DataVisualizer();
+        });
+    </script>
+</body>
+</html>
